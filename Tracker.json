@@ -1,0 +1,343 @@
+{
+  "name": "Sent Emails Tracker (Read-only)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2303614d-f679-48e8-a94c-0344adc62e61",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1L7m8fe6gUEZMfAzsEZksiXJLUVgm0DA7ShCt-xXoS4E",
+          "mode": "list",
+          "cachedResultName": "N8N Automation"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "keepFirstRow": true
+      },
+      "id": "",
+      "name": "Clear Old Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 500,
+        "filters": {
+          "q": "in:sent newer_than:60d",
+          "readStatus": "both"
+        }
+      },
+      "id": "575e8018-67af-472d-9b25-437144faa5b6",
+      "name": "Get Sent Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "webhookId": "c87781f7-bd20-428a-b6d2-7f52e5df9788",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "date",
+              "name": "date_sent",
+              "type": "string",
+              "value": "={{ DateTime.fromMillis(Number($json.internalDate)).toFormat(\"yyyy-MM-dd\") }}"
+            },
+            {
+              "id": "subject",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $json.Subject }}"
+            },
+            {
+              "id": "position",
+              "name": "position_applied",
+              "type": "string",
+              "value": "={{ (($json.Subject || \"\").match(/(?:application|applying|apply)\\s*(?:for|to)?\\s*[:\\-–]?\\s*(?:the\\s*)?(.+?)(?:\\s+(?:position|role|at)\\b.*)?$/i) || [])[1] || $json.Subject }}"
+            },
+            {
+              "id": "to",
+              "name": "sent_to",
+              "type": "string",
+              "value": "={{ $json.To }}"
+            },
+            {
+              "id": "resend",
+              "name": "resend_on",
+              "type": "string",
+              "value": "={{ DateTime.fromMillis(Number($json.internalDate)).plus({ days: 7 }).toFormat(\"yyyy-MM-dd\") }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "992d7e90-9452-45be-b4a9-d51c6febebca",
+      "name": "Format Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const groups = {};\nfor (const item of $input.all()) {\n  const j = item.json;\n  const subj = String(j.subject || '').replace(/^(s*(re|fwd?|fw)s*:s*)+/i, '').replace(/[‐-―−]/g, '-').replace(/s+/g, ' ').trim().toLowerCase();\n  const rawTo = String(j.sent_to || '');\n  const emails = (rawTo.match(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+.[A-Za-z]{2,}/g) || [rawTo.trim()]).map((e) => e.toLowerCase()).sort().join(',');\n  const key = subj + '||' + emails;\n  if (!groups[key]) {\n    groups[key] = { ...j, times_sent: 0 };\n  }\n  groups[key].times_sent += 1;\n  if (j.date_sent > groups[key].date_sent) {\n    groups[key].date_sent = j.date_sent;\n    groups[key].resend_on = j.resend_on;\n  }\n}\nreturn Object.values(groups).map((g) => ({ json: g }));"
+      },
+      "id": "2c5f2a3e-e2b5-47f8-80c7-52fb97cf2185",
+      "name": "Count Times Sent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "date_sent",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "",
+      "name": "Sort Newest First",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1L7m8fe6gUEZMfAzsEZksiXJLUVgm0DA7ShCt-xXoS4E",
+          "mode": "list",
+          "cachedResultName": "N8N Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1O7_zP7NQowYjUTwTig2_L0Zrub9jxRsW8-4cppV8EpM/edit?usp=sharing"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1O7_zP7NQowYjUTwTig2_L0Zrub9jxRsW8-4cppV8EpM/edit?usp=sharing/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date_sent": "={{ $json.date_sent }}",
+            "subject": "={{ $json.subject }}",
+            "position_applied": "={{ $json.position_applied }}",
+            "sent_to": "={{ $json.sent_to }}",
+            "resend_on": "={{ $json.resend_on }}",
+            "times_sent": "={{ $json.times_sent }}"
+          },
+          "matchingColumns": [
+            "subject",
+            "sent_to"
+          ],
+          "schema": [
+            {
+              "id": "date_sent",
+              "displayName": "date_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "position_applied",
+              "displayName": "position_applied",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sent_to",
+              "displayName": "sent_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resend_on",
+              "displayName": "resend_on",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "times_sent",
+              "displayName": "times_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "",
+      "name": "",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Clear Old Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Old Rows": {
+      "main": [
+        [
+          {
+            "node": "Get Sent Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sent Emails": {
+      "main": [
+        [
+          {
+            "node": "Format Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Fields": {
+      "main": [
+        [
+          {
+            "node": "Count Times Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Times Sent": {
+      "main": [
+        [
+          {
+            "node": "Sort Newest First",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Newest First": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d1332528-3ca5-4669-8eeb-3e93b9d37299",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c3089dbd1d4d5f79d0bb12cfcd07396727dc3964f8744520e98e91fe5bcc674e"
+  },
+  "nodeGroups": [],
+  "id": "o2gv3giW0Ob4CWRp",
+  "tags": []
+}
