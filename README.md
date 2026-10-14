@@ -50,7 +50,3 @@ Never commit client secrets, access tokens, refresh tokens, or exported credenti
 - The resend date is a suggested follow-up date, not an automatically sent email.
 - Check the spreadsheet-writing and clearing behavior before running the workflow against an existing spreadsheet.
 - Use a dedicated output worksheet to protect unrelated data.
-
-## License
-
-Add your chosen open-source license before distributing the workflow.
